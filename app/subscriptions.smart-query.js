@@ -942,6 +942,194 @@ window.SubscriptionsSmartQuery = (function () {
       .replace(/\{\{RETRIEVAL_CONTEXT\}\}/g, retrievalContext);
   };
 
+  const isLikelyBrowserModelNetworkError = (message) =>
+    /Failed to fetch|NetworkError|Load failed|ERR_FAILED|ERR_TIMED_OUT|CORS|blocked by/i.test(
+      String(message || ''),
+    );
+
+  const CJK_TOPIC_HINTS = [
+    {
+      match: /脑电|腦電|电生理|電生理|脑机|腦機|\bEEG\b|electroencephalography/i,
+      tag: 'eeg',
+      terms: [
+        ['electroencephalography', '脑电图'],
+        ['EEG signal processing', '脑电信号处理'],
+        ['brain computer interface', '脑机接口'],
+        ['neural decoding', '神经解码'],
+        ['event related potentials', '事件相关电位'],
+        ['motor imagery', '运动想象'],
+      ],
+      intents: [
+        ['electroencephalography signal processing and neural decoding', '脑电信号处理与神经解码'],
+        ['brain computer interface methods using EEG signals', '基于脑电信号的脑机接口方法'],
+      ],
+    },
+    {
+      match: /大语言模型|大模型|语言模型|\bLLM\b|large language model/i,
+      tag: 'llm',
+      terms: [
+        ['large language model', '大语言模型'],
+        ['retrieval augmented generation', '检索增强生成'],
+        ['language model alignment', '语言模型对齐'],
+        ['instruction tuning', '指令微调'],
+        ['agentic workflow', '智能体工作流'],
+        ['long context reasoning', '长上下文推理'],
+      ],
+      intents: [
+        ['large language model methods and applications', '大语言模型方法与应用'],
+        ['retrieval augmented generation and agentic workflows', '检索增强生成与智能体工作流'],
+      ],
+    },
+    {
+      match: /强化学习|強化學習|reinforcement learning|\bRL\b/i,
+      tag: 'rl',
+      terms: [
+        ['reinforcement learning', '强化学习'],
+        ['policy optimization', '策略优化'],
+        ['reward modeling', '奖励建模'],
+        ['offline reinforcement learning', '离线强化学习'],
+        ['multi agent reinforcement learning', '多智能体强化学习'],
+        ['model based reinforcement learning', '基于模型的强化学习'],
+      ],
+      intents: [
+        ['reinforcement learning algorithms and reward modeling', '强化学习算法与奖励建模'],
+        ['offline and model based reinforcement learning methods', '离线与基于模型的强化学习方法'],
+      ],
+    },
+    {
+      match: /医学|医疗|臨床|临床|影像|medical|clinical|radiology/i,
+      tag: 'medical-ai',
+      terms: [
+        ['medical artificial intelligence', '医学人工智能'],
+        ['clinical decision support', '临床决策支持'],
+        ['medical image analysis', '医学影像分析'],
+        ['multimodal medical data', '多模态医学数据'],
+        ['biomedical natural language processing', '生物医学自然语言处理'],
+        ['clinical prediction model', '临床预测模型'],
+      ],
+      intents: [
+        ['medical artificial intelligence for clinical decision support', '用于临床决策支持的医学人工智能'],
+        ['multimodal medical data analysis and prediction models', '多模态医学数据分析与预测模型'],
+      ],
+    },
+  ];
+
+  const FALLBACK_STOPWORDS = new Set([
+    'about',
+    'after',
+    'also',
+    'and',
+    'application',
+    'applications',
+    'approach',
+    'approaches',
+    'based',
+    'between',
+    'can',
+    'for',
+    'from',
+    'how',
+    'into',
+    'method',
+    'methods',
+    'model',
+    'models',
+    'new',
+    'of',
+    'on',
+    'paper',
+    'papers',
+    'research',
+    'study',
+    'system',
+    'systems',
+    'that',
+    'the',
+    'this',
+    'using',
+    'with',
+  ]);
+
+  const pushUniqueFallbackTerm = (items, keyword, keywordCn = '') => {
+    const cleaned = normalizeText(keyword)
+      .replace(/[_-]+/g, ' ')
+      .replace(/[^A-Za-z0-9 ]+/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim()
+      .toLowerCase();
+    if (!cleaned || !/[a-z]/i.test(cleaned)) return;
+    if (containsCjk(cleaned) || isWeakAcronymKeyword(cleaned)) return;
+    if (items.some((item) => normalizePhrase(item.keyword) === normalizePhrase(cleaned))) return;
+    items.push({
+      keyword: cleaned,
+      keyword_cn: normalizeText(keywordCn),
+      query: cleaned,
+    });
+  };
+
+  const extractEnglishFallbackTerms = (tag, desc) => {
+    const source = `${tag || ''} ${desc || ''}`;
+    const normalized = source
+      .replace(/[_-]+/g, ' ')
+      .replace(/[^A-Za-z0-9 ]+/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim()
+      .toLowerCase();
+    if (!normalized) return [];
+    const words = normalized
+      .split(/\s+/)
+      .filter((word) => word && !FALLBACK_STOPWORDS.has(word) && !/^\d+$/.test(word));
+    const phrases = [];
+    for (let size = Math.min(4, words.length); size >= 2; size -= 1) {
+      for (let idx = 0; idx <= words.length - size; idx += 1) {
+        phrases.push(words.slice(idx, idx + size).join(' '));
+      }
+    }
+    words.forEach((word) => {
+      if (word.length > 3) phrases.push(word);
+    });
+    return phrases;
+  };
+
+  const buildLocalFallbackCandidates = (tag, desc) => {
+    const source = `${tag || ''} ${desc || ''}`;
+    const matchedHints = CJK_TOPIC_HINTS.filter((hint) => hint.match.test(source));
+    const keywords = [];
+    const intentQueries = [];
+
+    matchedHints.forEach((hint) => {
+      hint.terms.forEach(([keyword, keywordCn]) => pushUniqueFallbackTerm(keywords, keyword, keywordCn));
+      hint.intents.forEach(([query, queryCn]) => {
+        intentQueries.push({ query, query_cn: queryCn });
+      });
+    });
+
+    extractEnglishFallbackTerms(tag, desc).forEach((keyword) => pushUniqueFallbackTerm(keywords, keyword));
+
+    if (!keywords.length) {
+      pushUniqueFallbackTerm(keywords, sanitizeAutoTag(tag).replace(/-/g, ' ') || 'scientific literature');
+      pushUniqueFallbackTerm(keywords, 'research methods');
+      pushUniqueFallbackTerm(keywords, 'applied machine learning');
+    }
+
+    const primary = keywords[0] && keywords[0].keyword ? keywords[0].keyword : 'scientific literature';
+    if (!intentQueries.length) {
+      intentQueries.push(
+        { query: `${primary} methods and applications`, query_cn: '' },
+        { query: `${primary} recent advances`, query_cn: '' },
+      );
+    }
+
+    const normalized = normalizeGenerated({
+      tag: sanitizeAutoTag(tag) || (matchedHints[0] && matchedHints[0].tag) || 'topic',
+      description: desc,
+      keywords: keywords.slice(0, 8),
+      intent_queries: intentQueries.slice(0, 4),
+    });
+    normalized._localFallback = true;
+    return normalized;
+  };
+
   const requestCandidatesByDesc = async (tag, desc) => {
     const llm = loadLlmConfig();
     if (!llm) {
@@ -1110,6 +1298,9 @@ window.SubscriptionsSmartQuery = (function () {
     clearTimeout(timeout);
     if (!res) {
       if (fetchError) {
+        if (isLikelyBrowserModelNetworkError(fetchError)) {
+          return buildLocalFallbackCandidates(tag, desc);
+        }
         throw new Error(`模型服务请求失败：${fetchError}`);
       }
       throw new Error(errorText || '模型服务请求失败，请检查网络与密钥配置。');
