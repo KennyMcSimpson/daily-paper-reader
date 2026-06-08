@@ -7,10 +7,11 @@
     root.DPRLLMConfigUtils = api;
   }
 })(typeof globalThis !== 'undefined' ? globalThis : this, function () {
-  const DEFAULT_DEEPSEEK_BASE_URL = 'https://api.deepseek.com';
+  const DEFAULT_DEEPSEEK_BASE_URL = 'https://api.openai.com/v1';
   const DEFAULT_DEEPSEEK_CHAT_MODELS = [
-    'deepseek-v4-flash',
-    'deepseek-v4-pro',
+    'gpt-5.4-mini',
+    'gpt-5-mini',
+    'gpt-4.1-mini',
   ];
   const DEEPSEEK_V4_MAX_OUTPUT_TOKENS = 393216;
   const DEEPSEEK_PRESETS = Object.freeze({
@@ -19,6 +20,12 @@
       label: 'DeepSeek 官方',
       baseUrl: 'https://api.deepseek.com',
       models: Object.freeze(['deepseek-v4-flash', 'deepseek-v4-pro']),
+    }),
+    openai: Object.freeze({
+      key: 'openai',
+      label: 'OpenAI',
+      baseUrl: 'https://api.openai.com/v1',
+      models: Object.freeze(['gpt-5.4-mini', 'gpt-5-mini', 'gpt-4.1-mini']),
     }),
   });
 
@@ -113,8 +120,14 @@
     const safeSecret = secret && typeof secret === 'object' ? secret : {};
     const llmProvider = safeSecret.llmProvider || {};
     const explicit = normalizeText(llmProvider.type || llmProvider.provider || '').toLowerCase();
-    if (explicit === 'deepseek') {
-      return 'deepseek';
+    if (explicit === 'deepseek' || explicit === 'openai') {
+      return explicit;
+    }
+    const summarized = safeSecret.summarizedLLM || {};
+    const baseUrl = normalizeBaseUrlForStorage(summarized.baseUrl || '').toLowerCase();
+    const model = normalizeText(summarized.model || '').toLowerCase();
+    if (/(^|\/\/)(api\.)?openai\.com(?:$|\/)/i.test(baseUrl) || model.startsWith('gpt-')) {
+      return 'openai';
     }
     return 'deepseek';
   };
@@ -139,6 +152,12 @@
     }
     if (normalizedModel.startsWith('deepseek-')) {
       return 'deepseek';
+    }
+    if (/(^|\/\/)(api\.)?openai\.com(?:$|\/)/i.test(normalizedBaseUrl)) {
+      return 'openai';
+    }
+    if (normalizedModel.startsWith('gpt-') || /^o\d/.test(normalizedModel)) {
+      return 'openai';
     }
     return 'unsupported';
   };

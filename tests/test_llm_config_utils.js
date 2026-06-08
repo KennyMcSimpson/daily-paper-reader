@@ -89,11 +89,11 @@ function testInferProviderType() {
     inferProviderType({
       summarizedLLM: {
         apiKey: 'sk',
-        baseUrl: 'https://example.com/v1',
-        model: 'other-model',
+        baseUrl: 'https://api.openai.com/v1',
+        model: 'gpt-5.4-mini',
       },
     }),
-    'deepseek',
+    'openai',
   );
 }
 
@@ -118,7 +118,7 @@ function testInferChatApiProfile() {
     inferChatApiProfile('https://api.deepseek.com', 'deepseek-v4-flash'),
     'deepseek',
   );
-  assert.equal(inferChatApiProfile('https://example.com/v1', 'other-model'), 'unsupported');
+  assert.equal(inferChatApiProfile('https://api.openai.com/v1', 'gpt-5.4-mini'), 'openai');
   assert.equal(inferChatApiProfile('https://example.com/v1', 'other-model'), 'unsupported');
 }
 

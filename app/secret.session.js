@@ -301,15 +301,16 @@
   };
   const getDefaultDeepSeekBaseUrl = () => {
     const utils = getLLMUtils();
-    return normalizeBaseUrlForStorage(utils.DEFAULT_DEEPSEEK_BASE_URL || 'https://api.deepseek.com');
+    return normalizeBaseUrlForStorage(utils.DEFAULT_DEEPSEEK_BASE_URL || 'https://api.openai.com/v1');
   };
   const getDefaultDeepSeekChatModels = () => {
     const utils = getLLMUtils();
       const defaults = Array.isArray(utils.DEFAULT_DEEPSEEK_CHAT_MODELS)
         ? utils.DEFAULT_DEEPSEEK_CHAT_MODELS
         : [
-            'deepseek-v4-flash',
-            'deepseek-v4-pro',
+            'gpt-5.4-mini',
+            'gpt-5-mini',
+            'gpt-4.1-mini',
           ];
     return sanitizeModelList(defaults, 99);
   };
@@ -1107,7 +1108,7 @@
       );
       const initialApiKey = normalizeText(currentSummaryLLM.apiKey || '');
       const initialDeepSeekModel =
-        normalizeText(currentSummaryLLM.model || '') || 'deepseek-v4-flash';
+        normalizeText(currentSummaryLLM.model || '') || 'gpt-5.4-mini';
       const deepseekSummaryModels = getDefaultDeepSeekChatModels().map((model) => ({
         value: model,
         label: model === 'deepseek-v4-flash'
@@ -1321,9 +1322,9 @@
       providerInputs.forEach((input) => {
         input.checked = input.value === 'deepseek';
       });
-      deepseekModelSelect.value = initialDeepSeekModel || 'deepseek-v4-flash';
+      deepseekModelSelect.value = initialDeepSeekModel || 'gpt-5.4-mini';
       if (!deepseekModelSelect.value) {
-        deepseekModelSelect.value = 'deepseek-v4-flash';
+        deepseekModelSelect.value = 'gpt-5.4-mini';
       }
       rerankerProfileSelect.innerHTML = RERANKER_PROFILES
         .map(
