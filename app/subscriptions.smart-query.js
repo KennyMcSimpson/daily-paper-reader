@@ -1058,8 +1058,8 @@ window.SubscriptionsSmartQuery = (function () {
       .trim()
       .toLowerCase();
     if (!cleaned || !/[a-z]/i.test(cleaned)) return;
-    if (containsCjk(cleaned) || isWeakAcronymKeyword(cleaned)) return;
-    if (items.some((item) => normalizePhrase(item.keyword) === normalizePhrase(cleaned))) return;
+    if (containsCjk(cleaned) || /^[a-z]{1,3}$/i.test(cleaned)) return;
+    if (items.some((item) => normalizeText(item.keyword).toLowerCase() === cleaned)) return;
     items.push({
       keyword: cleaned,
       keyword_cn: normalizeText(keywordCn),
@@ -3102,6 +3102,7 @@ window.SubscriptionsSmartQuery = (function () {
       defaultPromptTemplate,
       containsCjk,
       deriveTagFromCandidates,
+      buildLocalFallbackCandidates,
       isEnglishRetrievalText,
       normalizeGenerated,
       sanitizeAutoTag,

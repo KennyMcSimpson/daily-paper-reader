@@ -9,6 +9,7 @@ global.document = global.document || {
 require('../app/subscriptions.smart-query.js');
 
 const {
+  buildLocalFallbackCandidates,
   buildPromptFromTemplate,
   containsCjk,
   defaultPromptTemplate,
@@ -178,11 +179,27 @@ function testProfileSelectionPersistsAcrossRerender() {
   );
 }
 
+function testLocalFallbackHandlesChineseEegRequest() {
+  const fallback = buildLocalFallbackCandidates('EEG', '请帮我查找EEG相关的论文');
+
+  assert.equal(fallback._localFallback, true);
+  assert.ok(fallback.keywords.length > 0);
+  assert.ok(fallback.intent_queries.length > 0);
+  assert.ok(
+    fallback.keywords.some((item) => item.keyword === 'electroencephalography'),
+  );
+  fallback.keywords.forEach((item) => {
+    assert.equal(containsCjk(item.keyword), false);
+    assert.equal(isEnglishRetrievalText(item.query), true);
+  });
+}
+
 testPromptRequiresEnglishRetrievalFieldsAndChineseCnFields();
 testSuggestedTagIsEnglishAndAtMostTwelveChars();
 testGeneratedCandidatesKeepChineseOutOfRetrievalFields();
 testGeneratedCandidatesDropWeakAcronymKeywords();
 testGeneratedCandidatesDoNotCollapseConceptToSingleModifier();
 testProfileSelectionPersistsAcrossRerender();
+testLocalFallbackHandlesChineseEegRequest();
 
 console.log('subscriptions smart query tests passed');
