@@ -1458,17 +1458,26 @@
       const collectProviderDraft = () => {
         const apiKey = normalizeText(deepseekInput.value);
         const model = selectedDeepSeekModel();
+        const summaryBaseUrl = getDefaultDeepSeekBaseUrl();
+        const providerType =
+          inferProviderType({
+            summarizedLLM: {
+              apiKey,
+              baseUrl: summaryBaseUrl,
+              model,
+            },
+          }) || 'deepseek';
         if (!apiKey) {
           throw new Error('请先输入 DeepSeek API Key。');
         }
         if (!model) {
           throw new Error('请选择用于工作流总结的大模型。');
         }
-        const reranker = buildRerankerDraft(apiKey, getDefaultDeepSeekBaseUrl());
+        const reranker = buildRerankerDraft(apiKey, summaryBaseUrl);
         return {
-          providerType: 'deepseek',
+          providerType,
           summaryApiKey: apiKey,
-          summaryBaseUrl: getDefaultDeepSeekBaseUrl(),
+          summaryBaseUrl,
           summaryModel: model,
           chatModels: getDefaultDeepSeekChatModels(),
           skipRerank: false,
