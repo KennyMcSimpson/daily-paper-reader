@@ -1,10 +1,31 @@
 import pathlib
+import re
 import unittest
 
 import yaml
 
 
 class ConferenceWorkflowAndUiTest(unittest.TestCase):
+    def test_upstream_sync_delay_reserves_ten_minutes_for_sync(self):
+        root = pathlib.Path(__file__).resolve().parents[1]
+        workflow = yaml.safe_load(
+            (root / ".github" / "workflows" / "sync.yml").read_text(encoding="utf-8")
+        )
+        job = workflow["jobs"]["sync_latest_from_upstream"]
+        delay_step = next(step for step in job["steps"] if "shuf " in step.get("run", ""))
+        delay_range = re.search(r"shuf\s+-i\s+(\d+)-(\d+)\s+-n\s+1", delay_step["run"])
+
+        self.assertIsNotNone(delay_range, "The scheduled delay must have a bounded range")
+        minimum, maximum = map(int, delay_range.groups())
+        self.assertGreaterEqual(minimum, 0)
+        self.assertGreaterEqual(maximum, minimum)
+        self.assertLessEqual(
+            maximum + 10 * 60,
+            job["timeout-minutes"] * 60,
+            "The maximum jitter must leave at least ten minutes for checkout and sync",
+        )
+        self.assertEqual(delay_step["if"], "github.event_name == 'schedule'")
+
     def test_daily_workflow_uses_fast_rerank_budget(self):
         root = pathlib.Path(__file__).resolve().parents[1]
         workflow_path = root / ".github" / "workflows" / "daily-paper-reader.yml"

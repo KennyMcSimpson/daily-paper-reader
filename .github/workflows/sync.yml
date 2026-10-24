@@ -23,8 +23,9 @@ jobs:
       - name: Random delay to spread scheduled runs
         if: github.event_name == 'schedule'
         run: |
-          DELAY=$(shuf -i 0-3599 -n 1)
-          echo "Sleeping ${DELAY}s (≈$((DELAY/60))min) to stagger fork runs over 1 hour …"
+          # Keep at least 10 minutes of the 15-minute job budget for sync.
+          DELAY=$(shuf -i 0-300 -n 1)
+          echo "Sleeping ${DELAY}s (≈$((DELAY/60))min) to stagger fork runs over 5 minutes …"
           sleep $DELAY
 
       # 1. 检出用户仓库的代码
